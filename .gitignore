@@ -1,0 +1,5 @@
+# Local build artifacts
+agent-c
+
+# IDE
+.idea/
