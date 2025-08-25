@@ -2,13 +2,24 @@ CC = gcc
 TARGET = agent-c
 SOURCES = main.c json.c agent.c cli.c utils.c
 
+# Detect OS once
+UNAME := $(shell uname)
+
 # Optimized build flags for smallest size
-CFLAGS_OPT = -std=c99 -Oz -DNDEBUG -ffunction-sections -fdata-sections \
+CFLAGS_OPT = -std=c99 -D_POSIX_C_SOURCE=200809L -Oz -DNDEBUG \
+             -ffunction-sections -fdata-sections \
              -fno-stack-protector -fno-unwind-tables -fno-asynchronous-unwind-tables \
              -fno-math-errno -ffast-math -fmerge-all-constants -flto \
-             -fomit-frame-pointer -fno-ident -fno-stack-check -fno-exceptions \
-             -fno-rtti -fno-threadsafe-statics -fvisibility=hidden -fno-builtin \
-             -Wl,-dead_strip -Wl,-x -Wl,-S
+             -fomit-frame-pointer -fno-ident -fno-stack-check \
+             -fvisibility=hidden -fno-builtin
+
+# Linker flags per-OS (do not put -Wl flags in CFLAGS)
+ifeq ($(UNAME),Darwin)
+LDFLAGS_OPT = -Wl,-dead_strip -Wl,-x -Wl,-S
+else
+# GNU ld: garbage collect unused sections and keep binary small
+LDFLAGS_OPT = -Wl,--gc-sections
+endif
 
 # Auto-detect platform and build appropriately
 all:
@@ -24,7 +35,7 @@ all:
 # macOS build with GZEXE compression (7.9KB)
 macos: $(SOURCES)
 	@echo "Building optimized binary for macOS..."
-	$(CC) $(CFLAGS_OPT) -o $(TARGET) $(SOURCES)
+	$(CC) $(CFLAGS_OPT) -o $(TARGET) $(SOURCES) $(LDFLAGS_OPT)
 	strip -S -x $(TARGET) 2>/dev/null || strip $(TARGET)
 	@echo "Applying GZEXE compression..."
 	gzexe $(TARGET)
@@ -33,7 +44,7 @@ macos: $(SOURCES)
 # Linux build with UPX compression (~16KB)
 linux: $(SOURCES)
 	@echo "Building optimized binary for Linux..."
-	$(CC) $(CFLAGS_OPT) -o $(TARGET) $(SOURCES)
+	$(CC) $(CFLAGS_OPT) -o $(TARGET) $(SOURCES) $(LDFLAGS_OPT)
 	strip --strip-all $(TARGET) 2>/dev/null || strip $(TARGET)
 	@echo "Applying UPX compression..."
 	@which upx >/dev/null 2>&1 && upx --best $(TARGET) || echo "⚠️ UPX not found, binary uncompressed"
