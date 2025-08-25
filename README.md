@@ -47,4 +47,4 @@ export OR_KEY=your_openrouter_api_key_here
 
 ## License
 
-Copy me, no licence.
+**CC0 - "No Rights Reserved"**
