@@ -64,7 +64,8 @@ char* json_request(const Agent* agent, const Config* config, char* out, size_t s
         "\"tool_choice\":\"auto\","
         "\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"execute_command\","
         "\"description\":\"Execute shell command\",\"parameters\":{\"type\":\"object\",\"properties\":{\"command\":{\"type\":\"string\"}},"
-        "\"required\":[\"command\"]}}}]}";
+        "\"required\":[\"command\"]}}}],"
+        "\"provider\":{\"only\":[\"cerebras\"]}}";
     snprintf(out, size, template, config->model, messages, config->temp, config->max_tokens);
     
     return out;
