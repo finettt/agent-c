@@ -35,8 +35,6 @@ int http_request(const char* req, char* resp, size_t resp_size) {
     
     int pclose_result = pclose(pipe);
     unlink(temp);
-    
-    // Проверяем, завершился ли curl успешно
     if (WIFEXITED(pclose_result)) {
         int exit_status = WEXITSTATUS(pclose_result);
         if (exit_status != 0) {
@@ -50,31 +48,23 @@ int http_request(const char* req, char* resp, size_t resp_size) {
 }
 
 void load_config(void) {
-    // Инициализируем конфигурацию безопасными значениями по умолчанию
     config.temp = 0.1;
     config.max_tokens = 1000;
     config.api_key[0] = '\0';
     config.api_url[0] = '\0';
     config.model[0] = '\0';
-    
-    // Загружаем API ключ с проверкой длины
     char* key = getenv("OPENAI_KEY");
     if (key && strlen(key) > 0 && strlen(key) < 127) {
         strncpy(config.api_key, key, 127);
         config.api_key[127] = '\0';
     }
-
-    // Загружаем URL API с проверкой длины и формата
     char* url = getenv("OPENAI_BASE");
     if (url && strlen(url) > 0 && strlen(url) < 127) {
-        // Простая проверка URL
         if (strstr(url, "http://") || strstr(url, "https://")) {
             strncpy(config.api_url, url, 127);
             config.api_url[127] = '\0';
         }
     }
-
-    // Загружаем модель с проверкой длины
     char* model = getenv("OPENAI_MODEL");
     if (model && strlen(model) > 0 && strlen(model) < 63) {
         strncpy(config.model, model, 63);

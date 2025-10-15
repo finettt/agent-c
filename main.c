@@ -5,7 +5,6 @@ Config config;
 
 void cleanup(int sig) {
     (void)sig;
-    // Здесь можно добавить очистку ресурсов при необходимости
     _exit(0);
 }
 

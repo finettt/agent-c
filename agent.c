@@ -16,15 +16,12 @@ int execute_command(const char* response) {
     if (!extract_command(response, cmd, sizeof(cmd)) || !*cmd) return 0;
     
     printf("\033[31m$ %s\033[0m\n", cmd);
-    
-    // Санация команды: удаляем опасные символы и конструкции
     char safe_cmd[MAX_CONTENT] = {0};
     const char* src = cmd;
     char* dst = safe_cmd;
     size_t safe_len = 0;
     
     while (*src && safe_len < sizeof(safe_cmd) - 1) {
-        // Пропускаем опасные символы и конструкции
         if (*src == '`' || *src == '$' || *src == '|' || *src == '&' ||
             *src == ';' || *src == '(' || *src == ')' || *src == '<' ||
             *src == '>' || *src == '{' || *src == '}' || *src == '[' ||
@@ -33,8 +30,6 @@ int execute_command(const char* response) {
             src++;
             continue;
         }
-        
-        // Пропускаем конструкции типа $(...)
         if (*src == '$' && *(src + 1) == '(') {
             src += 2;
             int paren_count = 1;
@@ -45,8 +40,6 @@ int execute_command(const char* response) {
             }
             continue;
         }
-        
-        // Пропускаем конструкции типа `...`
         if (*src == '`') {
             src++;
             while (*src && *src != '`') src++;
@@ -58,11 +51,7 @@ int execute_command(const char* response) {
         safe_len++;
     }
     *dst = '\0';
-    
-    // Если после санации команда пустая, выходим
     if (!*safe_cmd) return 0;
-    
-    // Используем popen вместо system для большей безопасности
     FILE* pipe = popen(safe_cmd, "r");
     if (!pipe) return 0;
     
@@ -71,8 +60,6 @@ int execute_command(const char* response) {
     output[bytes] = '\0';
     
     int result = pclose(pipe);
-    
-    // Добавляем вывод команды в историю сообщений
     if (agent.msg_count < MAX_MESSAGES) {
         Message* msg = &agent.messages[agent.msg_count++];
         strcpy(msg->role, "tool");
@@ -84,8 +71,6 @@ int execute_command(const char* response) {
 
 int process_agent(const char* task) {
     if (!task || !*task) return -1;
-    
-    // Проверяем длину задачи
     if (strlen(task) >= MAX_CONTENT) {
         fprintf(stderr, "Task too long\n");
         return -1;
@@ -110,7 +95,6 @@ int process_agent(const char* task) {
     
     if (has_tool_call(resp)) {
         if (!execute_command(resp)) {
-            // Если команда выполнилась успешно, отправляем обновленный контент
             if (!json_request(&agent, &config, req, sizeof(req))) {
                 return -1;
             }
