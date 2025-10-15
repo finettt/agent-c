@@ -17,6 +17,7 @@ typedef struct {
 } Message;
 
 typedef struct { 
+    char api_url[128]
     char model[64]; 
     float temp; 
     int max_tokens; 

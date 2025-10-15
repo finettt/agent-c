@@ -17,41 +17,79 @@ int execute_command(const char* response) {
     
     printf("\033[31m$ %s\033[0m\n", cmd);
     
-    char temp[] = "/tmp/ai_cmd_XXXXXX";
-    int fd = mkstemp(temp);
-    if (fd == -1) return 0;
-    close(fd);
+    // Санация команды: удаляем опасные символы и конструкции
+    char safe_cmd[MAX_CONTENT] = {0};
+    const char* src = cmd;
+    char* dst = safe_cmd;
+    size_t safe_len = 0;
     
-    static const char* exec_template = "(%s) > '%s' 2>&1";
-    char full[MAX_BUFFER];
-    snprintf(full, MAX_BUFFER, exec_template, cmd, temp);
-    
-    int code = system(full);
-    FILE* f = fopen(temp, "r");
-    if (f) {
-        char result[MAX_CONTENT];
-        size_t bytes = fread(result, 1, MAX_CONTENT - 1, f);
-        result[bytes] = '\0';
-        fclose(f);
-        if (bytes > 0) {
-            printf("%s", result);
-            if (result[bytes-1] != '\n') printf("\n");
+    while (*src && safe_len < sizeof(safe_cmd) - 1) {
+        // Пропускаем опасные символы и конструкции
+        if (*src == '`' || *src == '$' || *src == '|' || *src == '&' ||
+            *src == ';' || *src == '(' || *src == ')' || *src == '<' ||
+            *src == '>' || *src == '{' || *src == '}' || *src == '[' ||
+            *src == ']' || *src == '*' || *src == '?' || *src == '#' ||
+            *src == '\\' || *src == '\n' || *src == '\r') {
+            src++;
+            continue;
         }
         
-        if (agent.msg_count < MAX_MESSAGES - 1) {
-            strcpy(agent.messages[agent.msg_count].role, "tool");
-            strncpy(agent.messages[agent.msg_count].content, result, MAX_CONTENT - 1);
-            agent.messages[agent.msg_count].content[MAX_CONTENT - 1] = '\0';
-            agent.msg_count++;
+        // Пропускаем конструкции типа $(...)
+        if (*src == '$' && *(src + 1) == '(') {
+            src += 2;
+            int paren_count = 1;
+            while (*src && paren_count > 0) {
+                if (*src == '(') paren_count++;
+                else if (*src == ')') paren_count--;
+                src++;
+            }
+            continue;
         }
+        
+        // Пропускаем конструкции типа `...`
+        if (*src == '`') {
+            src++;
+            while (*src && *src != '`') src++;
+            if (*src == '`') src++;
+            continue;
+        }
+        
+        *dst++ = *src++;
+        safe_len++;
     }
-    unlink(temp);
+    *dst = '\0';
     
-    return code == 0 ? 1 : 0;
+    // Если после санации команда пустая, выходим
+    if (!*safe_cmd) return 0;
+    
+    // Используем popen вместо system для большей безопасности
+    FILE* pipe = popen(safe_cmd, "r");
+    if (!pipe) return 0;
+    
+    char output[MAX_BUFFER] = {0};
+    size_t bytes = fread(output, 1, sizeof(output) - 1, pipe);
+    output[bytes] = '\0';
+    
+    int result = pclose(pipe);
+    
+    // Добавляем вывод команды в историю сообщений
+    if (agent.msg_count < MAX_MESSAGES) {
+        Message* msg = &agent.messages[agent.msg_count++];
+        strcpy(msg->role, "tool");
+        snprintf(msg->content, MAX_CONTENT, "Command output:\n%s", output);
+    }
+    
+    return WIFEXITED(result) ? WEXITSTATUS(result) : 0;
 }
 
 int process_agent(const char* task) {
-    if (!task) return -1;
+    if (!task || !*task) return -1;
+    
+    // Проверяем длину задачи
+    if (strlen(task) >= MAX_CONTENT) {
+        fprintf(stderr, "Task too long\n");
+        return -1;
+    }
     
     if (agent.msg_count >= MAX_MESSAGES - 1) {
         for (int i = 1; i < agent.msg_count - 5; i++) agent.messages[i] = agent.messages[i + 5];
@@ -64,14 +102,20 @@ int process_agent(const char* task) {
     agent.msg_count++;
     
     char req[MAX_BUFFER], resp[MAX_BUFFER];
-    json_request(&agent, &config, req, sizeof(req));
+    if (!json_request(&agent, &config, req, sizeof(req))) {
+        return -1;
+    }
     
     if (http_request(req, resp, sizeof(resp))) return -1;
     
     if (has_tool_call(resp)) {
-        execute_command(resp);
-        json_request(&agent, &config, req, sizeof(req));
-        http_request(req, resp, sizeof(resp));
+        if (!execute_command(resp)) {
+            // Если команда выполнилась успешно, отправляем обновленный контент
+            if (!json_request(&agent, &config, req, sizeof(req))) {
+                return -1;
+            }
+            if (http_request(req, resp, sizeof(resp))) return -1;
+        }
     }
     
     char content[MAX_CONTENT];
@@ -84,6 +128,9 @@ int process_agent(const char* task) {
             agent.messages[agent.msg_count].content[MAX_CONTENT - 1] = '\0';
             agent.msg_count++;
         }
+    } else {
+        fprintf(stderr, "Failed to extract content from response\n");
+        return -1;
     }
     
     return 0;

@@ -21,13 +21,26 @@ static char* json_find(const char* json, const char* key, char* out, size_t size
         strncpy(out, start, len);
         out[len] = '\0';
         
-        for (char* p = out; *p; p++) {
-            if (*p == '\\' && p[1]) {
+        for (char* p = out; *p && p < out + size - 1; p++) {
+            if (*p == '\\' && p[1] && p < out + size - 2) {
                 switch (p[1]) {
-                    case 'n': *p = '\n'; memmove(p+1, p+2, strlen(p+1)); break;
-                    case 't': *p = '\t'; memmove(p+1, p+2, strlen(p+1)); break;
-                    case 'r': *p = '\r'; memmove(p+1, p+2, strlen(p+1)); break;
-                    case '\\': case '"': memmove(p, p+1, strlen(p)); break;
+                    case 'n':
+                        *p = '\n';
+                        memmove(p+1, p+2, strlen(p+2) + 1);
+                        break;
+                    case 't':
+                        *p = '\t';
+                        memmove(p+1, p+2, strlen(p+2) + 1);
+                        break;
+                    case 'r':
+                        *p = '\r';
+                        memmove(p+1, p+2, strlen(p+2) + 1);
+                        break;
+                    case '\\':
+                    case '"':
+                        memmove(p, p+1, strlen(p+1) + 1);
+                        p--;
+                        break;
                 }
             }
         }
@@ -43,30 +56,79 @@ static char* json_find(const char* json, const char* key, char* out, size_t size
 }
 
 char* json_request(const Agent* agent, const Config* config, char* out, size_t size) {
-    if (!agent || !out) return NULL;
+    if (!agent || !config || !out || size == 0) return NULL;
+    if (!config->model || !*config->model) {
+        fprintf(stderr, "Error: model not configured\n");
+        return NULL;
+    }
     
     char messages[MAX_BUFFER] = "[";
     for (int i = 0; i < agent->msg_count; i++) {
-        if (i > 0) strcat(messages, ",");
+        if (i > 0) {
+            if (strlen(messages) + 1 >= sizeof(messages)) break;
+            strcat(messages, ",");
+        }
         const Message* msg = &agent->messages[i];
+        
+        char escaped_content[MAX_CONTENT * 2] = {0};
+        const char* src = msg->content;
+        char* dst = escaped_content;
+        size_t escaped_len = 0;
+        
+        while (*src && escaped_len < sizeof(escaped_content) - 1) {
+            switch (*src) {
+                case '"':  *dst++ = '\\'; *dst++ = '"'; escaped_len += 2; break;
+                case '\\': *dst++ = '\\'; *dst++ = '\\'; escaped_len += 2; break;
+                case '\b': *dst++ = '\\'; *dst++ = 'b'; escaped_len += 2; break;
+                case '\f': *dst++ = '\\'; *dst++ = 'f'; escaped_len += 2; break;
+                case '\n': *dst++ = '\\'; *dst++ = 'n'; escaped_len += 2; break;
+                case '\r': *dst++ = '\\'; *dst++ = 'r'; escaped_len += 2; break;
+                case '\t': *dst++ = '\\'; *dst++ = 't'; escaped_len += 2; break;
+                default:
+                    if (*src >= 0 && *src < 32) {
+                    } else {
+                        *dst++ = *src;
+                        escaped_len++;
+                    }
+                    break;
+            }
+            src++;
+        }
+        *dst = '\0';
+        
         char temp[MAX_CONTENT + 100];
         if (!strcmp(msg->role, "tool")) {
-            snprintf(temp, sizeof(temp), "{\"role\":\"tool\",\"content\":\"%s\"}", msg->content);
+            snprintf(temp, sizeof(temp), "{\"role\":\"tool\",\"content\":\"%s\"}", escaped_content);
         } else {
-            snprintf(temp, sizeof(temp), "{\"role\":\"%s\",\"content\":\"%s\"}", 
-                    msg->role, msg->content);
+            snprintf(temp, sizeof(temp), "{\"role\":\"%s\",\"content\":\"%s\"}",
+                    msg->role, escaped_content);
         }
-        if (strlen(messages) + strlen(temp) + 10 < sizeof(messages)) strcat(messages, temp);
+        
+        if (strlen(messages) + strlen(temp) + 1 < sizeof(messages)) {
+            strcat(messages, temp);
+        } else {
+            fprintf(stderr, "Warning: message truncated due to size limit\n");
+            break;
+        }
     }
-    strcat(messages, "]");
+    
+    if (strlen(messages) + 1 >= sizeof(messages)) {
+        messages[sizeof(messages) - 1] = '\0';
+    } else {
+        strcat(messages, "]");
+    }
     
     const char* template = "{\"model\":\"%s\",\"messages\":%s,\"temperature\":%.1f,\"max_tokens\":%d,\"stream\":false,"
         "\"tool_choice\":\"auto\","
         "\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"execute_command\","
         "\"description\":\"Execute shell command\",\"parameters\":{\"type\":\"object\",\"properties\":{\"command\":{\"type\":\"string\"}},"
-        "\"required\":[\"command\"]}}}],"
-        "\"provider\":{\"only\":[\"cerebras\"]}}";
-    snprintf(out, size, template, config->model, messages, config->temp, config->max_tokens);
+        "\"required\":[\"command\"]}}}]}";
+    
+    int result = snprintf(out, size, template, config->model, messages, config->temp, config->max_tokens);
+    if (result < 0 || (size_t)result >= size) {
+        fprintf(stderr, "Error: JSON request buffer too small\n");
+        return NULL;
+    }
     
     return out;
 }

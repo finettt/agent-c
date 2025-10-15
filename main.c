@@ -5,7 +5,8 @@ Config config;
 
 void cleanup(int sig) {
     (void)sig;
-    exit(0);
+    // Здесь можно добавить очистку ресурсов при необходимости
+    _exit(0);
 }
 
 int main(void) {
@@ -15,7 +16,11 @@ int main(void) {
     load_config();
     
     if (!config.api_key[0]) {
-        fprintf(stderr, "OR_KEY required\n");
+        fprintf(stderr, "OPENAI_KEY required\n");
+        return 1;
+    }
+    if (!config.api_url[0]) {
+        fprintf(stderr, "OPENAI_BASE required\n");
         return 1;
     }
     
