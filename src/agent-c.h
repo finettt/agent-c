@@ -9,10 +9,17 @@
 #ifdef __linux__
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <limits.h>
+#include <fcntl.h>
 #else
 // Windows-specific implementations
 #define WIFEXITED(status) (1)
 #define WEXITSTATUS(status) (status)
+#ifdef _WIN32
+#include <direct.h>
+#define realpath(N,R) _fullpath((R),(N),_MAX_PATH)
+#define getcwd(B,S) _getcwd(B,S)
+#endif
 #endif
 
 #define MAX_MESSAGES 20
