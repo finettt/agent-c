@@ -57,7 +57,7 @@ static char* json_find(const char* json, const char* key, char* out, size_t size
 
 char* json_request(const Agent* agent, const Config* config, char* out, size_t size) {
     if (!agent || !config || !out || size == 0) return NULL;
-    if (!config->model || !*config->model) {
+    if (config->model[0] == '\0') {
         fprintf(stderr, "Error: model not configured\n");
         return NULL;
     }
@@ -86,6 +86,16 @@ char* json_request(const Agent* agent, const Config* config, char* out, size_t s
                 case '\t': *dst++ = '\\'; *dst++ = 't'; escaped_len += 2; break;
                 default:
                     if (*src >= 0 && *src < 32) {
+                        // Escape control characters as \uXXXX
+                        if (escaped_len + 6 <= sizeof(escaped_content) - 1) {
+                            *dst++ = '\\';
+                            *dst++ = 'u';
+                            *dst++ = '0';
+                            *dst++ = '0';
+                            *dst++ = "0123456789ABCDEF"[*src >> 4];
+                            *dst++ = "0123456789ABCDEF"[*src & 0x0F];
+                            escaped_len += 6;
+                        }
                     } else {
                         *dst++ = *src;
                         escaped_len++;
