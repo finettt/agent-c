@@ -6,6 +6,14 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#ifdef __linux__
+#include <sys/wait.h>
+#include <sys/stat.h>
+#else
+// Windows-specific implementations
+#define WIFEXITED(status) (1)
+#define WEXITSTATUS(status) (status)
+#endif
 
 #define MAX_MESSAGES 20
 #define MAX_BUFFER 8192
@@ -16,12 +24,15 @@ typedef struct {
     char content[MAX_CONTENT]; 
 } Message;
 
-typedef struct { 
-    char api_url[128]
-    char model[64]; 
-    float temp; 
-    int max_tokens; 
-    char api_key[128]; 
+typedef struct {
+    char api_url[128];
+    char model[64];
+    float temp;
+    int max_tokens;
+    char api_key[128];
+    char rag_path[256];
+    int rag_enabled;
+    int rag_snippets;
 } Config;
 
 typedef struct { 
@@ -57,5 +68,7 @@ void init_agent(void);
 int execute_command(const char* response);
 void run_cli(void);
 void load_config(void);
+int search_rag_files(const char* path, const char* query, char* snippets, size_t size);
+int parse_args(int argc, char* argv[]);
 
 #endif

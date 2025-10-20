@@ -16,10 +16,13 @@ int http_request(const char* req, char* resp, size_t resp_size) {
         return -1;
     }
     
+    // Set secure permissions for temporary file (read/write only for owner)
+    chmod(temp, 0600);
+    
     static const char* curl_template = "curl -s -X POST '%s/v1/chat/completions' "
         "-H 'Content-Type: application/json' -H 'Authorization: Bearer %s' -d @'%s' --max-time 60";
     char curl[MAX_BUFFER];
-    if (snprintf(curl, sizeof(curl), curl_template, config.api_url, config.api_key, temp) >= sizeof(curl)) {
+    if (snprintf(curl, sizeof(curl), curl_template, config.api_url, config.api_key, temp) >= (int)sizeof(curl)) {
         unlink(temp);
         return -1;
     }
@@ -53,6 +56,10 @@ void load_config(void) {
     config.api_key[0] = '\0';
     config.api_url[0] = '\0';
     config.model[0] = '\0';
+    config.rag_path[0] = '\0';
+    config.rag_enabled = 0;
+    config.rag_snippets = 5;
+    
     char* key = getenv("OPENAI_KEY");
     if (key && strlen(key) > 0 && strlen(key) < 127) {
         strncpy(config.api_key, key, 127);
@@ -69,5 +76,18 @@ void load_config(void) {
     if (model && strlen(model) > 0 && strlen(model) < 63) {
         strncpy(config.model, model, 63);
         config.model[63] = '\0';
+    }
+    char* rag_path = getenv("RAG_PATH");
+    if (rag_path && strlen(rag_path) > 0 && strlen(rag_path) < 255) {
+        strncpy(config.rag_path, rag_path, 255);
+        config.rag_path[255] = '\0';
+    }
+    char* rag_enabled = getenv("RAG_ENABLED");
+    if (rag_enabled && strcmp(rag_enabled, "1") == 0) {
+        config.rag_enabled = 1;
+    }
+    char* rag_snippets = getenv("RAG_SNIPPETS");
+    if (rag_snippets && atoi(rag_snippets) > 0) {
+        config.rag_snippets = atoi(rag_snippets);
     }
 }

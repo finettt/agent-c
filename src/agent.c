@@ -81,10 +81,30 @@ int process_agent(const char* task) {
         agent.msg_count -= 5;
     }
     
-    strcpy(agent.messages[agent.msg_count].role, "user");
-    strncpy(agent.messages[agent.msg_count].content, task, MAX_CONTENT - 1);
-    agent.messages[agent.msg_count].content[MAX_CONTENT - 1] = '\0';
-    agent.msg_count++;
+    char rag_snippets[MAX_BUFFER] = {0};
+    if (config.rag_enabled && config.rag_path[0]) {
+        if (search_rag_files(config.rag_path, task, rag_snippets, sizeof(rag_snippets)) == 0 && rag_snippets[0]) {
+            char enhanced_task[MAX_CONTENT * 2];
+            snprintf(enhanced_task, sizeof(enhanced_task),
+                    "User asked: %s\n\nRelevant snippets from local documents:\n%s\n\nPlease answer based on the user's request and the provided context.",
+                    task, rag_snippets);
+            
+            strcpy(agent.messages[agent.msg_count].role, "user");
+            strncpy(agent.messages[agent.msg_count].content, enhanced_task, MAX_CONTENT - 1);
+            agent.messages[agent.msg_count].content[MAX_CONTENT - 1] = '\0';
+            agent.msg_count++;
+        } else {
+            strcpy(agent.messages[agent.msg_count].role, "user");
+            strncpy(agent.messages[agent.msg_count].content, task, MAX_CONTENT - 1);
+            agent.messages[agent.msg_count].content[MAX_CONTENT - 1] = '\0';
+            agent.msg_count++;
+        }
+    } else {
+        strcpy(agent.messages[agent.msg_count].role, "user");
+        strncpy(agent.messages[agent.msg_count].content, task, MAX_CONTENT - 1);
+        agent.messages[agent.msg_count].content[MAX_CONTENT - 1] = '\0';
+        agent.msg_count++;
+    }
     
     char req[MAX_BUFFER], resp[MAX_BUFFER];
     if (!json_request(&agent, &config, req, sizeof(req))) {

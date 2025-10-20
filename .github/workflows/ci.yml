@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            binary_name: agent-c-linux
+            compression_tool: upx
+          - os: macos-latest
+            binary_name: agent-c-macos
+            compression_tool: gzexe
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+          sudo apt-get update
+          sudo apt-get install -y gcc curl upx
+        elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+          brew install gcc curl
+        fi
+
+    - name: Build project
+      run: |
+        make clean
+        make
+
+    - name: Verify binary
+      run: |
+        ./agent-c --help || true
+        ls -lh agent-c*
+        file agent-c
+
+    - name: Test basic functionality
+      run: |
+        # Test that binary can run and exit gracefully
+        timeout 5s ./agent-c || test $? -eq 124
+        echo "Binary test completed successfully"
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.binary_name }}
+        path: |
+          agent-c
+          agent-c~
+        retention-days: 30
+
+  test-compile:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc curl
+
+    - name: Test compilation
+      run: |
+        # Test that all source files compile correctly
+        gcc -c src/*.c -std=c99 -D_POSIX_C_SOURCE=200809L -Wall -Wextra
+        echo "All source files compile successfully"
+
+    - name: Test Makefile targets
+      run: |
+        make help
+        make clean
+        make
+        make clean
+        echo "Makefile targets work correctly"
