@@ -60,6 +60,10 @@ void load_config(void) {
     config.rag_enabled = 0;
     config.rag_snippets = 5;
     
+    // Set default API URL to OpenAI API
+    strncpy(config.api_url, "https://api.openai.com/v1", 127);
+    config.api_url[127] = '\0';
+    
     char* key = getenv("OPENAI_KEY");
     if (key && strlen(key) > 0 && strlen(key) < 127) {
         strncpy(config.api_key, key, 127);

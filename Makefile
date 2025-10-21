@@ -1,6 +1,6 @@
 CC = gcc
 TARGET = agent-c
-SOURCES = main.c json.c agent.c cli.c utils.c rag.c args.c
+SOURCES = src/main.c src/json.c src/agent.c src/cli.c src/utils.c src/rag.c src/args.c
 
 # Detect OS once
 UNAME := $(shell uname)

@@ -22,10 +22,6 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "OPENAI_KEY required\n");
         return 1;
     }
-    if (!config.api_url[0]) {
-        fprintf(stderr, "OPENAI_BASE required\n");
-        return 1;
-    }
     
     init_agent();
     run_cli();
