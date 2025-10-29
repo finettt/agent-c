@@ -1,0 +1,62 @@
+name: Build and Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y upx
+
+      - name: Build
+        run: make Linux
+
+      - name: Upload asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: agent-c
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install upx
+
+      - name: Build
+        run: make Darwin
+
+      - name: Upload asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: agent-c
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: choco install upx
+
+      - name: Build
+        run: make Windows
+
+      - name: Upload asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: agent-c.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -2,6 +2,7 @@
 
 extern Config config;
 
+#if RAG_ENABLED
 int search_rag_files(const char* path, const char* query, char* snippets, size_t size) {
     if (!path || !query || !snippets || size == 0) return -1;
 
@@ -101,3 +102,4 @@ int search_rag_files(const char* path, const char* query, char* snippets, size_t
 
     return 0; // Always return success for Windows compatibility
 }
+#endif /* RAG_ENABLED */
