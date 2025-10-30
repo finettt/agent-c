@@ -8,7 +8,7 @@ static char* json_find(const char* json, const char* key, char* out, size_t size
     if (!start) return NULL;
     start += strlen(pattern);
     while (*start == ' ' || *start == '\t') start++;
-    
+
     if (*start == '"') {
         start++;
         const char* end = start;
@@ -20,7 +20,7 @@ static char* json_find(const char* json, const char* key, char* out, size_t size
         if (len >= size) len = size - 1;
         strncpy(out, start, len);
         out[len] = '\0';
-        
+
         for (char* p = out; *p && p < out + size - 1; p++) {
             if (*p == '\\' && p[1] && p < out + size - 2) {
                 switch (p[1]) {
@@ -61,7 +61,7 @@ char* json_request(const Agent* agent, const Config* config, char* out, size_t s
         fprintf(stderr, "Error: model not configured\n");
         return NULL;
     }
-    
+
     char messages[MAX_BUFFER] = "[";
     for (int i = 0; i < agent->msg_count; i++) {
         if (i > 0) {
@@ -69,12 +69,12 @@ char* json_request(const Agent* agent, const Config* config, char* out, size_t s
             strcat(messages, ",");
         }
         const Message* msg = &agent->messages[i];
-        
+
         char escaped_content[MAX_CONTENT * 2] = {0};
         const char* src = msg->content;
         char* dst = escaped_content;
         size_t escaped_len = 0;
-        
+
         while (*src && escaped_len < sizeof(escaped_content) - 1) {
             switch (*src) {
                 case '"':  *dst++ = '\\'; *dst++ = '"'; escaped_len += 2; break;
@@ -105,7 +105,7 @@ char* json_request(const Agent* agent, const Config* config, char* out, size_t s
             src++;
         }
         *dst = '\0';
-        
+
         char temp[MAX_CONTENT + 100];
         if (!strcmp(msg->role, "tool")) {
             snprintf(temp, sizeof(temp), "{\"role\":\"tool\",\"content\":\"%s\"}", escaped_content);
@@ -113,7 +113,7 @@ char* json_request(const Agent* agent, const Config* config, char* out, size_t s
             snprintf(temp, sizeof(temp), "{\"role\":\"%s\",\"content\":\"%s\"}",
                     msg->role, escaped_content);
         }
-        
+
         if (strlen(messages) + strlen(temp) + 1 < sizeof(messages)) {
             strcat(messages, temp);
         } else {
@@ -121,25 +121,25 @@ char* json_request(const Agent* agent, const Config* config, char* out, size_t s
             break;
         }
     }
-    
+
     if (strlen(messages) + 1 >= sizeof(messages)) {
         messages[sizeof(messages) - 1] = '\0';
     } else {
         strcat(messages, "]");
     }
-    
+
     const char* template = "{\"model\":\"%s\",\"messages\":%s,\"temperature\":%.1f,\"max_tokens\":%d,\"stream\":false,"
         "\"tool_choice\":\"auto\","
         "\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"execute_command\","
         "\"description\":\"Execute shell command\",\"parameters\":{\"type\":\"object\",\"properties\":{\"command\":{\"type\":\"string\"}},"
         "\"required\":[\"command\"]}}}]}";
-    
+
     int result = snprintf(out, size, template, config->model, messages, config->temp, config->max_tokens);
     if (result < 0 || (size_t)result >= size) {
         fprintf(stderr, "Error: JSON request buffer too small\n");
         return NULL;
     }
-    
+
     return out;
 }
 
@@ -154,16 +154,15 @@ char* json_content(const char* response, char* out, size_t size) {
 
 int extract_command(const char* response, char* cmd, size_t cmd_size) {
     if (!response || !cmd) return 0;
-    
+
     const char* start = strstr(response, "\"tool_calls\":");
     if (!start) return 0;
-    
+
     start = strstr(start, "\"arguments\":");
     if (!start) return 0;
-    
+
     char args[1024];
     if (!json_find(start, "arguments", args, sizeof(args))) return 0;
-    
+
     return json_find(args, "command", cmd, cmd_size) != NULL;
 }
-

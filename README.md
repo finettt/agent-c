@@ -40,7 +40,7 @@ Set your OpenAI API key and configuration:
 
 ```bash
 export OPENAI_KEY=your_openai_api_key_here
-export OPENAI_BASE=https://api.openai.com/v1  # Optional, defaults to OpenAI
+export OPENAI_BASE=https://api.openai.com  # Optional, defaults to OpenAI
 export OPENAI_MODEL=gpt-3.5-turbo             # Optional, defaults to configured model
 export RAG_PATH=/path/to/documents            # Optional, for RAG functionality
 export RAG_ENABLED=1                         # Optional, enable RAG (1=enabled, 0=disabled)
