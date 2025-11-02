@@ -6,6 +6,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#include <time.h>
+#include <errno.h>
+
 #ifdef __linux__
 #include <sys/wait.h>
 #include <sys/stat.h>
@@ -17,6 +20,7 @@
 #define WEXITSTATUS(status) (status)
 #ifdef _WIN32
 #include <direct.h>
+#include <process.h>
 #define realpath(N,R) _fullpath((R),(N),_MAX_PATH)
 #define getcwd(B,S) _getcwd(B,S)
 #endif

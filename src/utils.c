@@ -10,6 +10,9 @@ static int create_temp_file(char* out_path, size_t out_size, const char* prefix)
     out_path[0] = '\0';
 
 #ifdef _WIN32
+    // Seed the random number generator to ensure unpredictable temp file names
+    srand((unsigned int)time(NULL));
+
     const char* temp_dir = getenv("TEMP");
     if (!temp_dir || !*temp_dir) temp_dir = getenv("TMP");
     if (!temp_dir || !*temp_dir) temp_dir = "C:\\Windows\\Temp";
