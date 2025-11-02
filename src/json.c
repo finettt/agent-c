@@ -54,7 +54,6 @@ static char* json_find(const char* json, const char* key, char* out, size_t size
     }
     return out;
 }
-
 char* json_request(const Agent* agent, const Config* config, char* out, size_t size) {
     if (!agent || !config || !out || size == 0) return NULL;
     if (config->model[0] == '\0') {
@@ -64,12 +63,9 @@ char* json_request(const Agent* agent, const Config* config, char* out, size_t s
 
     char messages[MAX_BUFFER] = "[";
     for (int i = 0; i < agent->msg_count; i++) {
-        if (i > 0) {
-            if (strlen(messages) + 1 >= sizeof(messages)) break;
-            strcat(messages, ",");
-        }
         const Message* msg = &agent->messages[i];
 
+        // This part for escaping the content remains the same.
         char escaped_content[MAX_CONTENT * 2] = {0};
         const char* src = msg->content;
         char* dst = escaped_content;
@@ -86,12 +82,8 @@ char* json_request(const Agent* agent, const Config* config, char* out, size_t s
                 case '\t': *dst++ = '\\'; *dst++ = 't'; escaped_len += 2; break;
                 default:
                     if (*src >= 0 && *src < 32) {
-                        // Escape control characters as \uXXXX
                         if (escaped_len + 6 <= sizeof(escaped_content) - 1) {
-                            *dst++ = '\\';
-                            *dst++ = 'u';
-                            *dst++ = '0';
-                            *dst++ = '0';
+                            *dst++ = '\\'; *dst++ = 'u'; *dst++ = '0'; *dst++ = '0';
                             *dst++ = "0123456789ABCDEF"[*src >> 4];
                             *dst++ = "0123456789ABCDEF"[*src & 0x0F];
                             escaped_len += 6;
@@ -114,19 +106,19 @@ char* json_request(const Agent* agent, const Config* config, char* out, size_t s
                     msg->role, escaped_content);
         }
 
-        if (strlen(messages) + strlen(temp) + 1 < sizeof(messages)) {
-            strcat(messages, temp);
-        } else {
+        const size_t prefix_len = (i > 0) ? 1 : 0;
+        const size_t temp_len = strlen(temp);
+        if (strlen(messages) + prefix_len + temp_len + 2 > sizeof(messages)) {
             fprintf(stderr, "Warning: message truncated due to size limit\n");
             break;
         }
-    }
 
-    if (strlen(messages) + 1 >= sizeof(messages)) {
-        messages[sizeof(messages) - 1] = '\0';
-    } else {
-        strcat(messages, "]");
+        if (i > 0) {
+            strcat(messages, ",");
+        }
+        strcat(messages, temp);
     }
+    strcat(messages, "]");
 
     const char* template = "{\"model\":\"%s\",\"messages\":%s,\"temperature\":%.1f,\"max_tokens\":%d,\"stream\":false,"
         "\"tool_choice\":\"auto\","
